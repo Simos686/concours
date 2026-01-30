@@ -41,6 +41,12 @@
             padding: 20px;
             border-radius: 10px;
             text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
         }
         
         .stat-value {
@@ -53,28 +59,96 @@
         .stat-label {
             font-size: 0.9rem;
             opacity: 0.8;
+            margin-top: 5px;
         }
         
         .admin-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
         }
         
         .admin-table th {
             background: rgba(0, 219, 222, 0.2);
-            padding: 12px;
+            padding: 15px;
             text-align: left;
             font-weight: 600;
+            color: #00dbde;
         }
         
         .admin-table td {
-            padding: 12px;
+            padding: 12px 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .admin-table tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .draw-btn {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .draw-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
+        }
+        
+        .draw-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .admin-form input,
+        .admin-form textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-family: inherit;
+        }
+        
+        .admin-form textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .contest-status {
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .status-active {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+        
+        .status-ended {
+            background: rgba(255, 65, 108, 0.2);
+            color: #ff416c;
         }
     </style>
 </head>
@@ -94,86 +168,147 @@
     </nav>
 
     <div class="admin-container">
-        <div class="admin-section">
-            <h2><i class="fas fa-chart-bar"></i> Dashboard Administrateur</h2>
-            <div id="adminLogin" style="display: block;">
-                <h3>Connexion Admin</h3>
-                <form id="adminLoginForm">
-                    <div class="input-group">
-                        <i class="fas fa-envelope"></i>
-                        <input type="email" id="adminEmail" placeholder="Email admin" required>
-                    </div>
-                    <div class="input-group">
-                        <i class="fas fa-lock"></i>
-                        <input type="password" id="adminPassword" placeholder="Mot de passe admin" required>
-                    </div>
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-sign-in-alt"></i> Se connecter
-                    </button>
-                </form>
+        <!-- Section Connexion Admin -->
+        <div class="admin-section" id="adminLoginSection">
+            <h2><i class="fas fa-lock"></i> Connexion Admin</h2>
+            <p>Accès réservé aux administrateurs</p>
+            <form id="adminLoginForm">
+                <input type="email" id="adminEmail" placeholder="Email admin" required>
+                <input type="password" id="adminPassword" placeholder="Mot de passe admin" required>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Se connecter
+                </button>
+            </form>
+        </div>
+        
+        <!-- Dashboard Admin (caché au début) -->
+        <div id="adminDashboard" style="display: none;">
+            <!-- Statistiques -->
+            <div class="admin-section">
+                <h2><i class="fas fa-chart-bar"></i> Tableau de bord</h2>
+                <div class="stats-grid" id="adminStatsGrid">
+                    <!-- Rempli dynamiquement -->
+                </div>
             </div>
             
-            <div id="adminContent" style="display: none;">
-                <div class="stats-grid" id="adminStatsGrid"></div>
-                
-                <div style="margin-top: 30px;">
-                    <h3><i class="fas fa-gift"></i> Gestion des concours</h3>
-                    <button onclick="adminApp.drawAllWinners()" class="btn-primary" style="margin-bottom: 20px;">
+            <!-- Tirage des gagnants -->
+            <div class="admin-section">
+                <h2><i class="fas fa-random"></i> Tirage des gagnants</h2>
+                <div class="action-buttons">
+                    <button onclick="adminApp.drawAllWinners()" class="btn-primary">
                         <i class="fas fa-random"></i> Tirer tous les gagnants
                     </button>
-                    <div id="currentContests"></div>
+                    <button onclick="adminApp.loadContests()" class="btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Actualiser
+                    </button>
                 </div>
-                
-                <div style="margin-top: 30px;">
-                    <h3><i class="fas fa-users"></i> Utilisateurs</h3>
-                    <div id="usersList"></div>
+                <div id="currentContests" style="margin-top: 20px;">
+                    <!-- Liste des concours -->
                 </div>
+            </div>
+            
+            <!-- Liste des utilisateurs -->
+            <div class="admin-section">
+                <h2><i class="fas fa-users"></i> Utilisateurs</h2>
+                <div id="usersList">
+                    <!-- Tableau des utilisateurs -->
+                </div>
+            </div>
+            
+            <!-- Participations -->
+            <div class="admin-section">
+                <h2><i class="fas fa-ticket-alt"></i> Participations</h2>
+                <div id="participationsList">
+                    <!-- Tableau des participations -->
+                </div>
+            </div>
+            
+            <!-- Ajout de concours -->
+            <div class="admin-section">
+                <h2><i class="fas fa-plus-circle"></i> Ajouter un concours</h2>
+                <form class="admin-form" id="addContestForm">
+                    <input type="text" id="contestName" placeholder="Nom du concours" required>
+                    <textarea id="contestDescription" placeholder="Description" required></textarea>
+                    <input type="text" id="contestPrize" placeholder="Prix à gagner" required>
+                    <input type="number" id="contestTickets" placeholder="Tickets requis" min="1" required>
+                    <input type="text" id="contestImage" placeholder="URL de l'image (optionnel)">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-plus"></i> Ajouter le concours
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
     <div id="notification" class="notification"></div>
 
+    <!-- Supabase -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="database.js"></script>
     <script>
+        // 👨‍💼 APPLICATION ADMIN
         class AdminApp {
             constructor() {
                 this.db = new SupabaseDatabase();
+                this.isAuthenticated = false;
                 this.init();
             }
             
             init() {
                 this.setupEventListeners();
+                this.checkAuth();
             }
             
             setupEventListeners() {
+                // Connexion admin
                 document.getElementById('adminLoginForm')?.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     await this.loginAdmin();
                 });
+                
+                // Ajout concours
+                document.getElementById('addContestForm')?.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await this.addContest();
+                });
+            }
+            
+            checkAuth() {
+                const auth = localStorage.getItem('admin_authenticated');
+                if (auth === 'true') {
+                    this.isAuthenticated = true;
+                    this.showDashboard();
+                    this.loadAdminData();
+                }
             }
             
             async loginAdmin() {
                 const email = document.getElementById('adminEmail').value;
                 const password = document.getElementById('adminPassword').value;
                 
-                // Vérification simple (en production, utilisez Supabase Auth)
+                // Vérification simple
                 if (email === 'admin@gamemarcus.com' && password === 'Admin123!') {
-                    document.getElementById('adminLogin').style.display = 'none';
-                    document.getElementById('adminContent').style.display = 'block';
-                    this.showNotification('✅ Connexion admin réussie', 'success');
+                    this.isAuthenticated = true;
+                    localStorage.setItem('admin_authenticated', 'true');
+                    this.showDashboard();
                     await this.loadAdminData();
+                    this.showNotification('✅ Connexion admin réussie', 'success');
                 } else {
                     this.showNotification('❌ Identifiants incorrects', 'error');
                 }
+            }
+            
+            showDashboard() {
+                document.getElementById('adminLoginSection').style.display = 'none';
+                document.getElementById('adminDashboard').style.display = 'block';
             }
             
             async loadAdminData() {
                 await this.loadStats();
                 await this.loadContests();
                 await this.loadUsers();
+                await this.loadParticipations();
             }
             
             async loadStats() {
@@ -189,12 +324,20 @@
                             <span class="stat-label">Concours</span>
                         </div>
                         <div class="stat-box">
+                            <span class="stat-value">${stats.data.activeContests}</span>
+                            <span class="stat-label">Concours actifs</span>
+                        </div>
+                        <div class="stat-box">
                             <span class="stat-value">${stats.data.totalWinners}</span>
                             <span class="stat-label">Gagnants</span>
                         </div>
                         <div class="stat-box">
-                            <span class="stat-value">${stats.data.totalTickets}</span>
-                            <span class="stat-label">Tickets totaux</span>
+                            <span class="stat-value">${stats.data.totalParticipations}</span>
+                            <span class="stat-label">Participations</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-value">${stats.data.totalTicketsDistributed}</span>
+                            <span class="stat-label">Tickets distribués</span>
                         </div>
                     `;
                     document.getElementById('adminStatsGrid').innerHTML = html;
@@ -202,22 +345,22 @@
             }
             
             async loadContests() {
-                const contests = await this.db.getContests();
+                const contests = await this.db.getAllContests();
                 if (contests.success) {
-                    let html = '<table class="admin-table"><thead><tr><th>Nom</th><th>Participants</th><th>Tickets requis</th><th>Statut</th><th>Action</th></tr></thead><tbody>';
+                    let html = '<table class="admin-table"><thead><tr><th>Nom</th><th>Participants</th><th>Tickets</th><th>Statut</th><th>Action</th></tr></thead><tbody>';
                     
                     contests.data.forEach(contest => {
                         html += `
                             <tr>
-                                <td>${contest.name}</td>
-                                <td>${contest.participants}</td>
+                                <td><strong>${contest.name}</strong><br><small>${contest.prize}</small></td>
+                                <td>${contest.participants || 0}</td>
                                 <td>${contest.tickets_required}</td>
-                                <td>${contest.status}</td>
+                                <td><span class="contest-status ${contest.status === 'active' ? 'status-active' : 'status-ended'}">${contest.status}</span></td>
                                 <td>
                                     <button onclick="adminApp.drawWinner('${contest.id}')" 
-                                            class="btn-secondary"
+                                            class="draw-btn"
                                             ${contest.status === 'ended' ? 'disabled' : ''}>
-                                        Tirer gagnant
+                                        ${contest.status === 'active' ? '🎲 Tirer gagnant' : 'Terminé'}
                                     </button>
                                 </td>
                             </tr>
@@ -230,7 +373,11 @@
             }
             
             async drawWinner(contestId) {
-                if (!confirm('Tirer un gagnant pour ce concours ?')) return;
+                if (!confirm('Voulez-vous vraiment tirer un gagnant pour ce concours ?')) {
+                    return;
+                }
+                
+                this.showNotification('🎲 Tirage en cours...', 'info');
                 
                 const result = await this.db.drawWinner(contestId);
                 if (result.success) {
@@ -242,16 +389,28 @@
             }
             
             async drawAllWinners() {
-                if (!confirm('Tirer les gagnants pour tous les concours actifs ?')) return;
+                if (!confirm('Tirer les gagnants pour tous les concours actifs ?')) {
+                    return;
+                }
                 
-                const contests = await this.db.getContests();
+                this.showNotification('🎲 Début du tirage global...', 'info');
+                
+                const contests = await this.db.getAllContests();
                 if (contests.success) {
-                    for (const contest of contests.data) {
-                        if (contest.status === 'active') {
-                            await this.drawWinner(contest.id);
-                            await new Promise(resolve => setTimeout(resolve, 1000));
+                    const activeContests = contests.data.filter(c => c.status === 'active');
+                    let winnersCount = 0;
+                    
+                    for (const contest of activeContests) {
+                        const result = await this.db.drawWinner(contest.id);
+                        if (result.success) {
+                            winnersCount++;
+                            this.showNotification(`✅ ${contest.name}: ${result.winner.username}`, 'success');
                         }
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                     }
+                    
+                    this.showNotification(`🎉 ${winnersCount} gagnant(s) tiré(s) !`, 'success');
+                    await this.loadAdminData();
                 }
             }
             
@@ -263,7 +422,7 @@
                     users.data.forEach(user => {
                         html += `
                             <tr>
-                                <td>${user.username}</td>
+                                <td><strong>${user.username}</strong></td>
                                 <td>${user.email}</td>
                                 <td>${user.tickets}</td>
                                 <td>${new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
@@ -273,6 +432,50 @@
                     
                     html += '</tbody></table>';
                     document.getElementById('usersList').innerHTML = html;
+                }
+            }
+            
+            async loadParticipations() {
+                const participations = await this.db.getAllParticipations();
+                if (participations.success) {
+                    let html = '<table class="admin-table"><thead><tr><th>Utilisateur</th><th>Concours</th><th>Tickets</th><th>Date</th></tr></thead><tbody>';
+                    
+                    participations.data.forEach(p => {
+                        html += `
+                            <tr>
+                                <td>${p.gamemarcus_users?.username || 'N/A'}</td>
+                                <td>${p.gamemarcus_contests?.name || 'N/A'}<br><small>${p.gamemarcus_contests?.prize || ''}</small></td>
+                                <td>${p.tickets_used}</td>
+                                <td>${new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table>';
+                    document.getElementById('participationsList').innerHTML = html;
+                }
+            }
+            
+            async addContest() {
+                const name = document.getElementById('contestName').value;
+                const description = document.getElementById('contestDescription').value;
+                const prize = document.getElementById('contestPrize').value;
+                const tickets = document.getElementById('contestTickets').value;
+                const image = document.getElementById('contestImage').value;
+                
+                if (!name || !description || !prize || !tickets) {
+                    this.showNotification('❌ Tous les champs sont requis', 'error');
+                    return;
+                }
+                
+                const result = await this.db.addContest(name, description, prize, tickets, image);
+                if (result.success) {
+                    this.showNotification('✅ Concours ajouté avec succès !', 'success');
+                    document.getElementById('addContestForm').reset();
+                    await this.loadContests();
+                    await this.loadStats();
+                } else {
+                    this.showNotification(`❌ ${result.error}`, 'error');
                 }
             }
             
