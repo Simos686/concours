@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Game-Marcus - Concours Gratuits</title>
+    <meta name="description" content="Participez à des concours gratuits pour gagner des cadeaux exceptionnels ! PlayStation, iPhone, PC Gaming et plus encore.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo-section">
+                <span class="logo">🎮</span>
+                <h1>Game-Marcus <span class="logo-sub">Concours</span></h1>
+            </div>
+            
+            <div class="user-section" id="userSection">
+                <!-- Rempli dynamiquement -->
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h2>GAGNEZ DES CADEAUX <span class="highlight">GRATUITEMENT</span></h2>
+                <p class="subtitle">Inscrivez-vous, gagnez des tickets, participez aux concours et remportez des prix exceptionnels !</p>
+                
+                <!-- Statistiques en temps réel -->
+                <div class="stats-banner">
+                    <div class="stat-item">
+                        <i class="fas fa-users"></i>
+                        <div>
+                            <span class="stat-number" id="totalUsers">0</span>
+                            <span class="stat-label">Joueurs actifs</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-gift"></i>
+                        <div>
+                            <span class="stat-number" id="totalPrizes">4</span>
+                            <span class="stat-label">Cadeaux à gagner</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-trophy"></i>
+                        <div>
+                            <span class="stat-number" id="totalWinners">0</span>
+                            <span class="stat-label">Gagnants heureux</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Auth Box -->
+                <div class="auth-box" id="authBox">
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="showTab('register')">
+                            <i class="fas fa-user-plus"></i> Inscription
+                        </button>
+                        <button class="tab-btn" onclick="showTab('login')">
+                            <i class="fas fa-sign-in-alt"></i> Connexion
+                        </button>
+                    </div>
+                    
+                    <!-- Inscription -->
+                    <div id="registerTab" class="tab-content active">
+                        <h3><i class="fas fa-rocket"></i> Créer mon compte</h3>
+                        <form id="registerForm">
+                            <div class="input-group">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="username" placeholder="Votre pseudo" required minlength="3" maxlength="20">
+                            </div>
+                            <div class="input-group">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="email" placeholder="Votre email" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="password" placeholder="Mot de passe" required minlength="6">
+                            </div>
+                            <button type="submit" class="btn-primary">
+                                <i class="fas fa-rocket"></i> S'inscrire et recevoir 10 tickets
+                            </button>
+                            <p class="terms">En vous inscrivant, vous acceptez nos <a href="#" onclick="showTerms()">conditions d'utilisation</a></p>
+                        </form>
+                    </div>
+                    
+                    <!-- Connexion -->
+                    <div id="loginTab" class="tab-content">
+                        <h3><i class="fas fa-key"></i> Se connecter</h3>
+                        <form id="loginForm">
+                            <div class="input-group">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="loginEmail" placeholder="Votre email" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="loginPassword" placeholder="Mot de passe" required>
+                            </div>
+                            <button type="submit" class="btn-primary">
+                                <i class="fas fa-sign-in-alt"></i> Se connecter
+                            </button>
+                            <p class="forgot-password">
+                                <a href="#" onclick="showForgotPassword()">Mot de passe oublié ?</a>
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Concours -->
+    <section class="contests-section">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-gift"></i> Concours en cours</h2>
+                <p>Tentez votre chance pour gagner ces magnifiques cadeaux</p>
+            </div>
+            
+            <div class="contests-grid" id="contestsGrid">
+                <!-- Rempli dynamiquement -->
+            </div>
+            
+            <div class="contest-info">
+                <i class="fas fa-info-circle"></i>
+                <p>Plus vous utilisez de tickets, plus vos chances de gagner augmentent !</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Gagner des tickets -->
+    <section class="earn-section">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-coins"></i> Gagner des tickets</h2>
+                <p>Actions quotidiennes renouvelables pour accumuler des tickets</p>
+            </div>
+            
+            <div class="actions-grid" id="actionsGrid">
+                <!-- Rempli dynamiquement -->
+            </div>
+            
+            <div class="daily-reset">
+                <i class="fas fa-sync-alt"></i>
+                <span>Les actions se réinitialisent tous les jours à minuit</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Mes participations -->
+    <section class="participations-section" id="myParticipations" style="display: none;">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-history"></i> Mes participations</h2>
+                <p>Suivez toutes vos participations et vos chances de gagner</p>
+            </div>
+            
+            <div class="dashboard">
+                <div class="user-stats-card">
+                    <h3><i class="fas fa-chart-line"></i> Mes statistiques</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon tickets">
+                                <i class="fas fa-ticket-alt"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="userTickets">0</span>
+                                <span class="stat-label">Tickets disponibles</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon participations">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="userParticipations">0</span>
+                                <span class="stat-label">Participations</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon chances">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="userWinChance">0%</span>
+                                <span class="stat-label">Chance moyenne</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="participations-list-container">
+                    <h3><i class="fas fa-list"></i> Historique des participations</h3>
+                    <div class="participations-list" id="participationsList">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Derniers gagnants -->
+    <section class="winners-section">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-trophy"></i> Derniers gagnants</h2>
+                <p>Ils ont gagné grâce à Game-Marcus !</p>
+            </div>
+            
+            <div class="winners-grid" id="winnersGrid">
+                <!-- Rempli dynamiquement -->
+            </div>
+            
+            <div class="draw-button">
+                <button class="btn-secondary" onclick="app.drawWinnersForAllContests()" id="drawWinnersBtn">
+                    <i class="fas fa-random"></i> Tirer les gagnants (Admin)
+                </button>
+                <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.7;">
+                    <i class="fas fa-lock"></i> Accès réservé aux administrateurs
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3><span class="logo">🎮</span> Game-Marcus</h3>
+                    <p>Plateforme de concours gratuits 100% légale et transparente.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-tiktok"></i></a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h3>Fonctionnalités</h3>
+                    <ul>
+                        <li><a href="#"><i class="fas fa-gift"></i> Concours gratuits</a></li>
+                        <li><a href="#"><i class="fas fa-ticket-alt"></i> Gagner des tickets</a></li>
+                        <li><a href="#"><i class="fas fa-trophy"></i> Tirage aléatoire</a></li>
+                        <li><a href="#"><i class="fas fa-chart-bar"></i> Statistiques</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h3>Outils</h3>
+                    <div class="footer-tools">
+                        <button class="tool-btn" onclick="window.open('admin.html', '_blank')">
+                            <i class="fas fa-cog"></i> Administration
+                        </button>
+                        <button class="tool-btn" onclick="app.exportUserData()">
+                            <i class="fas fa-download"></i> Mes données
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>© 2024 Game-Marcus Concours - Base de données en ligne - Accessible partout dans le monde</p>
+                <p class="disclaimer">Les données sont stockées de manière sécurisée sur Supabase. Les concours sont fictifs.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <div id="notification" class="notification"></div>
+    
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-file-contract"></i> Conditions d'utilisation</h3>
+            <div class="terms-content">
+                <p><strong>Données en ligne :</strong> Vos données sont stockées sur une base de données Supabase sécurisée.</p>
+                <p><strong>Accès international :</strong> Accessible depuis n'importe quel pays dans le monde.</p>
+                <p><strong>Données partagées :</strong> Les concours et gagnants sont visibles par tous les utilisateurs.</p>
+                <p><strong>Sécurité :</strong> Vos mots de passe sont hachés et sécurisés.</p>
+                <p><strong>Administration :</strong> Les administrateurs peuvent gérer les concours et tirer les gagnants.</p>
+            </div>
+            <button class="btn-primary" onclick="closeModal('termsModal')">J'ai compris</button>
+        </div>
+    </div>
+    
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-cog"></i> Panneau d'administration</h3>
+            <div class="admin-panel">
+                <div class="admin-section">
+                    <h4>Créer un nouveau concours</h4>
+                    <form id="adminContestForm">
+                        <input type="text" id="contestName" placeholder="Nom du concours" required>
+                        <textarea id="contestDescription" placeholder="Description" required></textarea>
+                        <input type="text" id="contestPrize" placeholder="Prix à gagner" required>
+                        <input type="number" id="contestTickets" placeholder="Tickets requis" min="1" required>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-plus"></i> Ajouter le concours
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="admin-section">
+                    <h4>Statistiques système</h4>
+                    <div class="system-stats">
+                        <p>Utilisateurs inscrits: <span id="adminUserCount">0</span></p>
+                        <p>Total participations: <span id="adminParticipationCount">0</span></p>
+                        <p>Total tickets distribués: <span id="adminTicketCount">0</span></p>
+                        <p>Concours actifs: <span id="adminContestCount">0</span></p>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-secondary" onclick="closeModal('adminModal')">Fermer</button>
+        </div>
+    </div>
+
+    <!-- Supabase SDK -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <!-- Configuration et base de données -->
+    <script src="config.js"></script>
+    <script src="database.js"></script>
+    
+    <!-- Application principale -->
+    <script src="script.js"></script>
+</body>
+</html>
