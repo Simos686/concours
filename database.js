@@ -288,7 +288,6 @@ class SupabaseDatabase {
             const { data, error } = await this.supabase
                 .from('gamemarcus_contests')
                 .select('*')
-                .eq('status', 'active')
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -387,7 +386,7 @@ class SupabaseDatabase {
         }
     }
 
-    // 📊 RÉCUPÉRER LES STATISTIQUES
+    // 📊 STATISTIQUES COMPLÈTES
     async getStatistics() {
         if (!this.supabase) {
             return {
@@ -396,7 +395,10 @@ class SupabaseDatabase {
                     totalUsers: 0,
                     totalContests: 4,
                     totalWinners: 0,
-                    totalTickets: 0
+                    totalTickets: 0,
+                    totalParticipations: 0,
+                    activeContests: 0,
+                    totalTicketsDistributed: 0
                 }
             };
         }
@@ -412,17 +414,36 @@ class SupabaseDatabase {
                 .from('gamemarcus_contests')
                 .select('*', { count: 'exact', head: true });
 
+            // Compter les concours actifs
+            const { count: activeContestCount } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'active');
+
             // Compter les gagnants
             const { count: winnerCount } = await this.supabase
                 .from('gamemarcus_winners')
                 .select('*', { count: 'exact', head: true });
 
-            // Calculer le total des tickets
+            // Compter les participations
+            const { count: participationCount } = await this.supabase
+                .from('gamemarcus_participations')
+                .select('*', { count: 'exact', head: true });
+
+            // Calculer le total des tickets actuellement
             const { data: users } = await this.supabase
                 .from('gamemarcus_users')
                 .select('tickets');
 
             const totalTickets = users ? users.reduce((sum, user) => sum + user.tickets, 0) : 0;
+
+            // Calculer le total des tickets distribués
+            const { data: ticketsData } = await this.supabase
+                .from('gamemarcus_tickets')
+                .select('amount');
+
+            const totalTicketsDistributed = ticketsData ? 
+                ticketsData.reduce((sum, ticket) => sum + Math.abs(ticket.amount), 0) : 0;
 
             return {
                 success: true,
@@ -430,17 +451,24 @@ class SupabaseDatabase {
                     totalUsers: userCount || 0,
                     totalContests: contestCount || 0,
                     totalWinners: winnerCount || 0,
-                    totalTickets: totalTickets
+                    totalTickets: totalTickets,
+                    totalParticipations: participationCount || 0,
+                    activeContests: activeContestCount || 0,
+                    totalTicketsDistributed: totalTicketsDistributed
                 }
             };
         } catch (error) {
+            console.error('Erreur statistiques:', error);
             return {
                 success: true,
                 data: {
                     totalUsers: 0,
                     totalContests: 4,
                     totalWinners: 0,
-                    totalTickets: 0
+                    totalTickets: 0,
+                    totalParticipations: 0,
+                    activeContests: 4,
+                    totalTicketsDistributed: 0
                 }
             };
         }
@@ -455,7 +483,12 @@ class SupabaseDatabase {
         try {
             const { data, error } = await this.supabase
                 .from('gamemarcus_winners')
-                .select('*')
+                .select(`
+                    *,
+                    gamemarcus_contests (
+                        name
+                    )
+                `)
                 .order('drawn_at', { ascending: false })
                 .limit(limit);
 
@@ -466,6 +499,243 @@ class SupabaseDatabase {
             return { success: true, data: data || [] };
         } catch (error) {
             return { success: true, data: [] };
+        }
+    }
+
+    // 👨‍💼 FONCTIONS ADMIN
+    async getAllUsers() {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_users')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data: data || [] };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getAllParticipations() {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_participations')
+                .select(`
+                    *,
+                    gamemarcus_users (
+                        username,
+                        email
+                    ),
+                    gamemarcus_contests (
+                        name,
+                        prize
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data: data || [] };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getAllContests() {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data: data || [] };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 🎲 TIRAGE AU SORT
+    async drawWinner(contestId) {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            console.log(`🎲 Début du tirage pour le concours ${contestId}`);
+
+            // 1. Récupérer le concours
+            const { data: contest, error: contestError } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*')
+                .eq('id', contestId)
+                .single();
+
+            if (contestError || !contest) {
+                return { success: false, error: 'Concours introuvable' };
+            }
+
+            // 2. Vérifier si le concours est actif
+            if (contest.status !== 'active') {
+                return { success: false, error: 'Ce concours est déjà terminé' };
+            }
+
+            // 3. Récupérer toutes les participations
+            const { data: participations, error: partError } = await this.supabase
+                .from('gamemarcus_participations')
+                .select('*')
+                .eq('contest_id', contestId);
+
+            if (partError) {
+                return { success: false, error: 'Erreur récupération participations' };
+            }
+
+            if (!participations || participations.length === 0) {
+                return { success: false, error: 'Aucun participant pour ce concours' };
+            }
+
+            // 4. Créer un tableau pondéré par tickets utilisés
+            const weightedParticipants = [];
+            participations.forEach(participation => {
+                // Chaque ticket utilisé = 1 chance
+                for (let i = 0; i < participation.tickets_used; i++) {
+                    weightedParticipants.push(participation.user_id);
+                }
+            });
+
+            if (weightedParticipants.length === 0) {
+                return { success: false, error: 'Aucun ticket utilisé pour ce concours' };
+            }
+
+            // 5. Sélection aléatoire pondérée
+            const randomIndex = Math.floor(Math.random() * weightedParticipants.length);
+            const winnerId = weightedParticipants[randomIndex];
+
+            // 6. Récupérer les infos du gagnant
+            const { data: winner, error: winnerError } = await this.supabase
+                .from('gamemarcus_users')
+                .select('username, email')
+                .eq('id', winnerId)
+                .single();
+
+            if (winnerError || !winner) {
+                return { success: false, error: 'Erreur récupération gagnant' };
+            }
+
+            // 7. Calculer le nombre total de tickets utilisés par le gagnant
+            const winnerParticipations = participations.filter(p => p.user_id === winnerId);
+            const totalTicketsUsed = winnerParticipations.reduce((sum, p) => sum + p.tickets_used, 0);
+
+            // 8. Enregistrer le gagnant
+            const { data: winnerRecord, error: saveError } = await this.supabase
+                .from('gamemarcus_winners')
+                .insert([{
+                    contest_id: contestId,
+                    user_id: winnerId,
+                    username: winner.username,
+                    email: winner.email,
+                    prize: contest.prize,
+                    tickets_used: totalTicketsUsed,
+                    drawn_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (saveError) {
+                console.error('Erreur enregistrement gagnant:', saveError);
+                return { success: false, error: 'Erreur enregistrement gagnant' };
+            }
+
+            // 9. Marquer le concours comme terminé
+            const { error: updateError } = await this.supabase
+                .from('gamemarcus_contests')
+                .update({ 
+                    status: 'ended',
+                    winner_id: winnerId,
+                    winner_date: new Date().toISOString()
+                })
+                .eq('id', contestId);
+
+            if (updateError) {
+                console.error('Erreur mise à jour concours:', updateError);
+                // On continue quand même, le gagnant est enregistré
+            }
+
+            // 10. Donner un bonus au gagnant (20 tickets)
+            await this.supabase
+                .from('gamemarcus_users')
+                .update({ tickets: winner.tickets + 20 })
+                .eq('id', winnerId);
+
+            // 11. Enregistrer la transaction bonus
+            await this.supabase
+                .from('gamemarcus_tickets')
+                .insert([{
+                    user_id: winnerId,
+                    amount: 20,
+                    type: 'winner_bonus',
+                    description: `Bonus gagnant: ${contest.name}`,
+                    created_at: new Date().toISOString()
+                }]);
+
+            console.log('✅ Tirage terminé avec succès:', winnerRecord);
+            return { 
+                success: true, 
+                winner: {
+                    id: winnerId,
+                    username: winner.username,
+                    email: winner.email,
+                    prize: contest.prize,
+                    contest_name: contest.name,
+                    tickets_used: totalTicketsUsed,
+                    date: new Date().toLocaleDateString('fr-FR')
+                }
+            };
+            
+        } catch (error) {
+            console.error('Erreur tirage:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ➕ AJOUTER UN CONCOURS
+    async addContest(name, description, prize, tickets_required, image_url = '') {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_contests')
+                .insert([{
+                    name,
+                    description,
+                    prize,
+                    tickets_required: parseInt(tickets_required),
+                    image_url,
+                    status: 'active',
+                    participants: 0,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
     }
 
