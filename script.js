@@ -13,6 +13,17 @@ class GameMarcusApp {
         this.setupEventListeners();
         this.loadBasicData();
         this.updateUI();
+        
+        // Vérifier si c'est l'admin pour afficher/masquer le bouton
+        this.checkAdminStatus();
+    }
+
+    checkAdminStatus() {
+        if (this.currentUser && this.currentUser.email === 'admin@gamemarcus.com') {
+            document.getElementById('drawWinnersBtn').style.display = 'block';
+        } else {
+            document.getElementById('drawWinnersBtn').style.display = 'none';
+        }
     }
 
     checkAutoLogin() {
@@ -49,6 +60,17 @@ class GameMarcusApp {
                 e.preventDefault();
                 e.stopPropagation();
                 this.login();
+                return false;
+            });
+        }
+
+        // Formulaire admin
+        const adminContestForm = document.getElementById('adminContestForm');
+        if (adminContestForm) {
+            adminContestForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.addNewContest();
                 return false;
             });
         }
@@ -128,6 +150,9 @@ class GameMarcusApp {
             this.loadBasicData();
             this.loadUserParticipations();
             
+            // Vérifier si admin
+            this.checkAdminStatus();
+            
             document.getElementById('loginForm').reset();
         } else {
             this.showNotification(`❌ ${result.error}`, 'error');
@@ -150,10 +175,11 @@ class GameMarcusApp {
                 this.renderContests(contestsResult.data);
             }
 
-            // Charger les stats
+            // Charger les stats DÉTAILLÉES
             const statsResult = await this.db.getStatistics();
             if (statsResult.success) {
                 this.updateStats(statsResult.data);
+                this.updateAdminStats(statsResult.data);
             }
 
             // Charger les gagnants
@@ -161,6 +187,9 @@ class GameMarcusApp {
             if (winnersResult.success) {
                 this.renderWinners(winnersResult.data);
             }
+
+            // Charger les actions
+            this.loadActions();
         } catch (error) {
             console.error('Erreur chargement données:', error);
         }
@@ -222,12 +251,44 @@ class GameMarcusApp {
         let winChance = 0;
         
         if (participationCount > 0) {
-            winChance = Math.min(participationCount * 2, 50);
+            // Calcul plus réaliste basé sur les tickets utilisés
+            const totalTicketsUsed = participations.reduce((sum, p) => sum + p.tickets_used, 0);
+            winChance = Math.min(totalTicketsUsed * 5, 80); // 5% par ticket utilisé
         }
 
         document.getElementById('userTickets').textContent = this.currentUser.tickets;
         document.getElementById('userParticipations').textContent = participationCount;
         document.getElementById('userWinChance').textContent = `${winChance}%`;
+    }
+
+    updateStats(stats) {
+        // Mettre à jour les statistiques principales
+        document.getElementById('totalUsers').textContent = stats.totalUsers;
+        document.getElementById('totalPrizes').textContent = stats.totalContests;
+        document.getElementById('totalWinners').textContent = stats.totalWinners;
+        
+        // Mettre à jour les statistiques supplémentaires si elles existent
+        if (stats.totalParticipations) {
+            const participationElement = document.getElementById('totalParticipations');
+            if (participationElement) {
+                participationElement.textContent = stats.totalParticipations;
+            }
+        }
+        
+        if (stats.totalTicketsDistributed) {
+            const ticketsElement = document.getElementById('totalTicketsDistributed');
+            if (ticketsElement) {
+                ticketsElement.textContent = stats.totalTicketsDistributed;
+            }
+        }
+    }
+
+    updateAdminStats(stats) {
+        // Mettre à jour les stats dans le panel admin
+        document.getElementById('adminUserCount').textContent = stats.totalUsers;
+        document.getElementById('adminParticipationCount').textContent = stats.totalParticipations || 0;
+        document.getElementById('adminTicketCount').textContent = stats.totalTicketsDistributed || 0;
+        document.getElementById('adminContestCount').textContent = stats.activeContests || 0;
     }
 
     renderContests(contests) {
@@ -242,26 +303,35 @@ class GameMarcusApp {
         container.innerHTML = contests.map(contest => {
             const canParticipate = this.currentUser && (this.currentUser.tickets >= contest.tickets_required);
             const userTickets = this.currentUser ? this.currentUser.tickets : 0;
+            const isActive = contest.status === 'active';
 
             return `
-                <div class="contest-card">
+                <div class="contest-card ${!isActive ? 'contest-ended' : ''}">
                     <h3><i class="fas fa-gift"></i> ${contest.name}</h3>
                     <p class="contest-description">${contest.description}</p>
                     <div class="prize-badge">🎁 ${contest.prize}</div>
                     <div class="contest-stats">
                         <span><i class="fas fa-users"></i> ${contest.participants || 0} participants</span>
                         <span><i class="fas fa-ticket-alt"></i> ${contest.tickets_required} ticket(s)</span>
+                        <span><i class="fas fa-info-circle"></i> ${isActive ? 'Actif' : 'Terminé'}</span>
                     </div>
-                    <button class="participate-btn" 
-                            onclick="app.participate(${contest.id})"
-                            ${this.currentUser && !canParticipate ? 'disabled' : ''}>
-                        <i class="fas fa-ticket-alt"></i>
-                        ${this.currentUser ? 
-                            (canParticipate ? 
-                                `Participer (${contest.tickets_required} ticket(s))` : 
-                                `Pas assez de tickets (${userTickets}/${contest.tickets_required})`) : 
-                            'Connectez-vous pour participer'}
-                    </button>
+                    ${isActive ? `
+                        <button class="participate-btn" 
+                                onclick="app.participate(${contest.id})"
+                                ${this.currentUser && !canParticipate ? 'disabled' : ''}>
+                            <i class="fas fa-ticket-alt"></i>
+                            ${this.currentUser ? 
+                                (canParticipate ? 
+                                    `Participer (${contest.tickets_required} ticket(s))` : 
+                                    `Pas assez de tickets (${userTickets}/${contest.tickets_required})`) : 
+                                'Connectez-vous pour participer'}
+                        </button>
+                    ` : `
+                        <button class="participate-btn" disabled style="background: #666;">
+                            <i class="fas fa-flag-checkered"></i> Concours terminé
+                        </button>
+                        ${contest.winner_id ? `<p style="text-align:center; margin-top:10px; color:#00ff88;">🏆 Gagnant annoncé</p>` : ''}
+                    `}
                 </div>
             `;
         }).join('');
@@ -277,6 +347,11 @@ class GameMarcusApp {
         const contestResult = await this.db.getContestById(contestId);
         if (contestResult.success) {
             const contest = contestResult.data;
+            
+            if (contest.status !== 'active') {
+                this.showNotification('❌ Ce concours est terminé', 'error');
+                return;
+            }
             
             if (!confirm(`Participer au concours "${contest.name}" avec ${contest.tickets_required} ticket(s) ?`)) {
                 return;
@@ -329,6 +404,45 @@ class GameMarcusApp {
         }
     }
 
+    loadActions() {
+        const actions = [
+            { id: 1, name: "Regarder une vidéo", tickets: 2, daily_limit: 3, icon: "fas fa-video" },
+            { id: 2, name: "Suivre Instagram", tickets: 3, daily_limit: 1, icon: "fab fa-instagram" },
+            { id: 3, name: "Suivre TikTok", tickets: 3, daily_limit: 1, icon: "fab fa-tiktok" },
+            { id: 4, name: "Parrainer un ami", tickets: 5, daily_limit: 10, icon: "fas fa-user-friends" }
+        ];
+
+        this.renderActions(actions);
+    }
+
+    renderActions(actions) {
+        const container = document.getElementById('actionsGrid');
+        if (!container) return;
+
+        container.innerHTML = actions.map(action => {
+            const canComplete = this.currentUser !== null;
+
+            return `
+                <div class="action-card">
+                    <div class="action-icon">
+                        <i class="${action.icon}"></i>
+                    </div>
+                    <h4>${action.name}</h4>
+                    <p class="action-description">Gagnez des tickets facilement</p>
+                    <div class="ticket-reward">
+                        <i class="fas fa-plus"></i>${action.tickets}
+                    </div>
+                    <button class="earn-btn" 
+                            onclick="app.earnTickets(${action.id}, ${action.tickets}, '${action.name}')"
+                            ${canComplete ? '' : 'disabled'}>
+                        <i class="fas fa-coins"></i>
+                        ${canComplete ? `Gagner (+${action.tickets})` : `Connectez-vous`}
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
     renderParticipations(participations) {
         const container = document.getElementById('participationsList');
         if (!container) return;
@@ -344,26 +458,29 @@ class GameMarcusApp {
             return;
         }
 
-        container.innerHTML = participations.map(p => `
-            <div class="participation-item">
-                <div class="participation-details">
-                    <h4>${p.gamemarcus_contests?.name || 'Concours'}</h4>
-                    <p style="font-size: 0.9em; margin: 5px 0; color: #ccc;">
-                        ${p.gamemarcus_contests?.description || ''}
-                    </p>
-                    <small style="opacity: 0.7;">
-                        ${new Date(p.created_at).toLocaleDateString('fr-FR')} • 
-                        Prix: ${p.gamemarcus_contests?.prize || 'N/A'} •
-                        Tickets: ${p.tickets_used}
-                    </small>
-                </div>
-                <div class="participation-stats">
-                    <div class="participation-tickets" style="background: rgba(0, 219, 222, 0.2); padding: 5px 15px; border-radius: 20px;">
-                        ${p.tickets_used} ticket(s)
+        container.innerHTML = participations.map(p => {
+            const contest = p.gamemarcus_contests;
+            return `
+                <div class="participation-item">
+                    <div class="participation-details">
+                        <h4>${contest?.name || 'Concours'}</h4>
+                        <p style="font-size: 0.9em; margin: 5px 0; color: #ccc;">
+                            ${contest?.description || ''}
+                        </p>
+                        <small style="opacity: 0.7;">
+                            ${new Date(p.created_at).toLocaleDateString('fr-FR')} • 
+                            Prix: ${contest?.prize || 'N/A'} •
+                            Tickets: ${p.tickets_used}
+                        </small>
+                    </div>
+                    <div class="participation-stats">
+                        <div class="participation-tickets" style="background: rgba(0, 219, 222, 0.2); padding: 5px 15px; border-radius: 20px;">
+                            ${p.tickets_used} ticket(s)
+                        </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     renderWinners(winners) {
@@ -381,30 +498,150 @@ class GameMarcusApp {
             return;
         }
 
-        container.innerHTML = winners.map(winner => `
-            <div class="winner-card">
-                <div class="winner-avatar" style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 2rem; color: white;">
-                    <i class="fas fa-crown"></i>
+        container.innerHTML = winners.map(winner => {
+            const contestName = winner.gamemarcus_contests?.name || 'Concours';
+            return `
+                <div class="winner-card">
+                    <div class="winner-avatar">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <h4 class="winner-name">${winner.username}</h4>
+                    <p class="winner-prize">${winner.prize}</p>
+                    <p class="contest-name">${contestName}</p>
+                    <p class="winner-date">
+                        ${new Date(winner.drawn_at).toLocaleDateString('fr-FR')}
+                    </p>
+                    <small>${winner.tickets_used || 1} ticket(s) utilisés</small>
                 </div>
-                <h4 class="winner-name">${winner.username}</h4>
-                <p class="winner-prize" style="color: var(--accent);">${winner.prize}</p>
-                <p class="winner-date" style="font-size: 0.9em; opacity: 0.7;">
-                    ${new Date(winner.drawn_at).toLocaleDateString('fr-FR')}
-                </p>
-                <small style="font-size: 0.8em; opacity: 0.6;">${winner.tickets_used || 1} ticket(s) utilisés</small>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    updateStats(stats) {
-        if (document.getElementById('totalUsers')) {
-            document.getElementById('totalUsers').textContent = stats.totalUsers;
+    // 🏆 TIRAGE DES GAGNANTS (ADMIN)
+    async drawWinnersForAllContests() {
+        if (!this.currentUser) {
+            this.showNotification('❌ Connectez-vous', 'error');
+            return;
         }
-        if (document.getElementById('totalPrizes')) {
-            document.getElementById('totalPrizes').textContent = stats.totalContests;
+
+        // Vérifier si c'est l'admin
+        const isAdmin = this.currentUser.email === 'admin@gamemarcus.com';
+        
+        if (!isAdmin) {
+            this.showNotification('❌ Accès réservé aux administrateurs', 'error');
+            return;
         }
-        if (document.getElementById('totalWinners')) {
-            document.getElementById('totalWinners').textContent = stats.totalWinners;
+
+        if (!confirm('⚠️ Tirer les gagnants pour tous les concours actifs ? Cette action est irréversible.')) {
+            return;
+        }
+
+        this.showNotification('🎲 Tirage en cours...', 'info');
+
+        // Récupérer tous les concours
+        const contestsResult = await this.db.getAllContests();
+        
+        if (!contestsResult.success || !contestsResult.data) {
+            this.showNotification('❌ Aucun concours trouvé', 'error');
+            return;
+        }
+
+        const activeContests = contestsResult.data.filter(c => c.status === 'active');
+        
+        if (activeContests.length === 0) {
+            this.showNotification('ℹ️ Aucun concours actif à tirer', 'info');
+            return;
+        }
+
+        let winnersCount = 0;
+        let errors = [];
+
+        for (const contest of activeContests) {
+            try {
+                this.showNotification(`🎲 Tirage pour: ${contest.name}...`, 'info');
+                
+                const result = await this.db.drawWinner(contest.id);
+                
+                if (result.success) {
+                    winnersCount++;
+                    this.showNotification(`✅ ${contest.name}: ${result.winner.username} a gagné !`, 'success');
+                } else {
+                    errors.push(`${contest.name}: ${result.error}`);
+                    this.showNotification(`❌ ${contest.name}: ${result.error}`, 'error');
+                }
+                
+                // Pause entre chaque tirage
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+            } catch (error) {
+                console.error('Erreur tirage:', error);
+                errors.push(`${contest.name}: Erreur technique`);
+            }
+        }
+
+        // Résumé final
+        let message = `🎉 ${winnersCount} gagnant(s) tiré(s) avec succès !`;
+        if (errors.length > 0) {
+            message += `\n\nErreurs (${errors.length}):\n${errors.join('\n')}`;
+        }
+        
+        this.showNotification(message, winnersCount > 0 ? 'success' : 'error');
+        
+        // Recharger les données
+        await this.loadBasicData();
+    }
+
+    // 👨‍💼 PANEL ADMIN
+    async showAdminPanel() {
+        if (!this.currentUser) {
+            this.showNotification('❌ Connectez-vous', 'error');
+            return;
+        }
+
+        // Vérifier si c'est l'admin
+        const isAdmin = this.currentUser.email === 'admin@gamemarcus.com';
+        
+        if (!isAdmin) {
+            this.showNotification('❌ Accès réservé aux administrateurs', 'error');
+            return;
+        }
+
+        // Charger les stats admin
+        await this.loadAdminStats();
+        showModal('adminModal');
+    }
+
+    async loadAdminStats() {
+        const stats = await this.db.getStatistics();
+        
+        if (stats.success) {
+            this.updateAdminStats(stats.data);
+        }
+    }
+
+    async addNewContest() {
+        if (!this.currentUser) return;
+
+        const name = document.getElementById('contestName').value;
+        const description = document.getElementById('contestDescription').value;
+        const prize = document.getElementById('contestPrize').value;
+        const tickets = document.getElementById('contestTickets').value;
+
+        if (!name || !description || !prize || !tickets) {
+            this.showNotification('❌ Tous les champs sont requis');
+            return;
+        }
+
+        const result = await this.db.addContest(name, description, prize, tickets);
+
+        if (result.success) {
+            this.showNotification('✅ Concours ajouté avec succès !', 'success');
+            document.getElementById('adminContestForm').reset();
+            await this.loadBasicData();
+            await this.loadAdminStats();
+            closeModal('adminModal');
+        } else {
+            this.showNotification(`❌ Erreur: ${result.error}`, 'error');
         }
     }
 
