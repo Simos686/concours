@@ -667,6 +667,187 @@ nav {
 }
 
 /* ===== PARTICIPATIONS SECTION ===== */
+/* Ajoutez ceci à votre fichier style.css */
+
+/* Section Mes participations */
+.my-participations {
+    padding: 80px 0;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+}
+
+.user-stats-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.user-stats-card h3 {
+    color: var(--primary);
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stats-grid {
+    display: grid;
+    gap: 15px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateX(5px);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-icon.tickets {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+}
+
+.stat-icon.participations {
+    background: linear-gradient(135deg, var(--accent), var(--primary));
+}
+
+.stat-icon.chances {
+    background: linear-gradient(135deg, var(--warning), var(--danger));
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    display: block;
+    background: linear-gradient(to right, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--gray);
+    display: block;
+}
+
+.participations-list-container {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.participations-list-container h3 {
+    color: var(--primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    background: rgba(15, 12, 41, 0.95);
+    padding: 10px 0;
+    z-index: 1;
+}
+
+.participations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.participation-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    border-left: 4px solid var(--primary);
+}
+
+.participation-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(5px);
+}
+
+.participation-details h4 {
+    color: var(--light);
+    margin-bottom: 5px;
+}
+
+.participation-stats {
+    text-align: right;
+}
+
+.participation-tickets {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    opacity: 0.7;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state h4 {
+    margin: 15px 0 10px;
+    color: var(--light);
+}
+
+.empty-state p {
+    color: var(--gray);
+}
 .participations-section {
     padding: 80px 0;
     background: rgba(0, 0, 0, 0.2);
@@ -1198,4 +1379,5 @@ footer {
 
 ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(var(--secondary), var(--primary));
+
 }
