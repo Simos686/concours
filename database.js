@@ -645,7 +645,6 @@ class SupabaseDatabase {
                     contest_id: contestId,
                     user_id: winnerId,
                     username: winner.username,
-                    email: winner.email,
                     prize: contest.prize,
                     tickets_used: totalTicketsUsed,
                     drawn_at: new Date().toISOString()
@@ -799,3 +798,4 @@ class SupabaseDatabase {
 
 // Exporter
 window.SupabaseDatabase = SupabaseDatabase;
+
