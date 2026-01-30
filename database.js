@@ -13,14 +13,12 @@ class SupabaseDatabase {
         // Vérifier la configuration
         if (!window.SUPABASE_CONFIG || !window.SUPABASE_CONFIG.url || !window.SUPABASE_CONFIG.anonKey) {
             console.error('❌ Configuration Supabase manquante !');
-            console.log('Configuration actuelle:', window.SUPABASE_CONFIG);
             this.supabase = null;
             return;
         }
         
         // Initialiser Supabase
         try {
-            console.log('Initialisation Supabase avec URL:', window.SUPABASE_CONFIG.url);
             this.supabase = supabase.createClient(
                 window.SUPABASE_CONFIG.url,
                 window.SUPABASE_CONFIG.anonKey
@@ -36,29 +34,23 @@ class SupabaseDatabase {
     async createUser(username, email, password) {
         console.log('Tentative création utilisateur:', { username, email });
         
-        // Vérifier que Supabase est initialisé
         if (!this.supabase) {
-            console.error('Supabase non initialisé');
             return { success: false, error: 'Base de données non disponible' };
         }
 
         try {
             // Vérifier si l'email existe déjà
-            const { data: existingUser, error: checkError } = await this.supabase
+            const { data: existingUser } = await this.supabase
                 .from('gamemarcus_users')
                 .select('*')
                 .eq('email', email)
                 .single();
 
-            if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = aucun résultat trouvé
-                console.error('Erreur vérification email:', checkError);
-            }
-
             if (existingUser) {
                 return { success: false, error: 'Cet email est déjà utilisé' };
             }
 
-            // Hash simple du mot de passe
+            // Hash du mot de passe
             const passwordHash = this.hashPassword(password);
 
             // Créer l'utilisateur
@@ -109,7 +101,6 @@ class SupabaseDatabase {
                 .single();
 
             if (error || !data) {
-                console.log('Connexion échouée pour:', email);
                 return { success: false, error: 'Email ou mot de passe incorrect' };
             }
 
@@ -119,19 +110,174 @@ class SupabaseDatabase {
                 .update({ last_login: new Date().toISOString() })
                 .eq('id', data.id);
 
-            console.log('✅ Connexion réussie pour:', data.username);
             return { success: true, user: data };
             
         } catch (error) {
-            console.error('Erreur connexion:', error);
             return { success: false, error: error.message };
         }
     }
 
-    // 🎯 RÉCUPÉRER LES CONCOURS
+    // 🎯 PARTICIPATION À UN CONCOURS
+    async participate(userId, contestId) {
+        console.log(`Participation: user ${userId}, contest ${contestId}`);
+        
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            // 1. Récupérer le concours
+            const { data: contest, error: contestError } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*')
+                .eq('id', contestId)
+                .single();
+
+            if (contestError || !contest) {
+                return { success: false, error: 'Concours introuvable' };
+            }
+
+            // 2. Récupérer l'utilisateur
+            const { data: user, error: userError } = await this.supabase
+                .from('gamemarcus_users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (userError || !user) {
+                return { success: false, error: 'Utilisateur introuvable' };
+            }
+
+            // 3. Vérifier si assez de tickets
+            if (user.tickets < contest.tickets_required) {
+                return { 
+                    success: false, 
+                    error: `Pas assez de tickets. Nécessaire: ${contest.tickets_required}, Disponible: ${user.tickets}` 
+                };
+            }
+
+            // 4. Vérifier si déjà participé
+            const { data: existingParticipation } = await this.supabase
+                .from('gamemarcus_participations')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('contest_id', contestId)
+                .single();
+
+            if (existingParticipation) {
+                return { success: false, error: 'Vous avez déjà participé à ce concours' };
+            }
+
+            // 5. Commencer une transaction
+            // a) Diminuer les tickets de l'utilisateur
+            const newTicketCount = user.tickets - contest.tickets_required;
+            
+            const { error: updateError } = await this.supabase
+                .from('gamemarcus_users')
+                .update({ tickets: newTicketCount })
+                .eq('id', userId);
+
+            if (updateError) {
+                console.error('Erreur mise à jour tickets:', updateError);
+                return { success: false, error: 'Erreur lors de la mise à jour des tickets' };
+            }
+
+            // b) Enregistrer la participation
+            const { data: participation, error: participationError } = await this.supabase
+                .from('gamemarcus_participations')
+                .insert([{
+                    user_id: userId,
+                    contest_id: contestId,
+                    tickets_used: contest.tickets_required,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (participationError) {
+                console.error('Erreur enregistrement participation:', participationError);
+                
+                // Rollback: remettre les tickets
+                await this.supabase
+                    .from('gamemarcus_users')
+                    .update({ tickets: user.tickets })
+                    .eq('id', userId);
+                
+                return { success: false, error: 'Erreur lors de l\'enregistrement' };
+            }
+
+            // c) Augmenter le compteur de participants du concours
+            const { error: contestUpdateError } = await this.supabase
+                .from('gamemarcus_contests')
+                .update({ participants: contest.participants + 1 })
+                .eq('id', contestId);
+
+            if (contestUpdateError) {
+                console.error('Erreur mise à jour participants:', contestUpdateError);
+            }
+
+            // d) Enregistrer la transaction ticket
+            await this.supabase
+                .from('gamemarcus_tickets')
+                .insert([{
+                    user_id: userId,
+                    amount: -contest.tickets_required,
+                    type: 'participation',
+                    description: `Participation au concours: ${contest.name}`,
+                    created_at: new Date().toISOString()
+                }]);
+
+            console.log('✅ Participation enregistrée avec succès');
+            return { 
+                success: true, 
+                ticketsUsed: contest.tickets_required,
+                newTicketCount: newTicketCount,
+                participation: participation
+            };
+            
+        } catch (error) {
+            console.error('Erreur participation:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 📋 RÉCUPÉRER LES PARTICIPATIONS D'UN UTILISATEUR
+    async getUserParticipations(userId) {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_participations')
+                .select(`
+                    *,
+                    gamemarcus_contests (
+                        name,
+                        prize,
+                        description,
+                        tickets_required
+                    )
+                `)
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Erreur récupération participations:', error);
+                return { success: false, error: error.message };
+            }
+
+            return { success: true, data: data || [] };
+            
+        } catch (error) {
+            console.error('Erreur participations:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 🎁 RÉCUPÉRER LES CONCOURS
     async getContests() {
         if (!this.supabase) {
-            console.log('Mode démo: renvoi concours fictifs');
             return { 
                 success: true, 
                 data: this.getDemoContests() 
@@ -145,19 +291,103 @@ class SupabaseDatabase {
                 .eq('status', 'active')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Erreur récupération concours:', error);
+                return { success: true, data: this.getDemoContests() };
+            }
             
-            // Si pas de concours, utiliser les démos
             const contests = data && data.length > 0 ? data : this.getDemoContests();
             return { success: true, data: contests };
             
         } catch (error) {
-            console.error('Erreur récupération concours:', error);
+            console.error('Erreur concours:', error);
             return { success: true, data: this.getDemoContests() };
         }
     }
 
-    // 📊 STATISTIQUES
+    // 🎯 RÉCUPÉRER UN CONCOURS PAR ID
+    async getContestById(contestId) {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*')
+                .eq('id', contestId)
+                .single();
+
+            if (error) {
+                return { success: false, error: 'Concours introuvable' };
+            }
+
+            return { success: true, data };
+            
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 💰 GAGNER DES TICKETS (ACTIONS)
+    async earnTickets(userId, amount, actionName) {
+        if (!this.supabase) {
+            return { success: false, error: 'Base de données non disponible' };
+        }
+
+        try {
+            // Récupérer l'utilisateur actuel
+            const { data: user, error: userError } = await this.supabase
+                .from('gamemarcus_users')
+                .select('tickets, total_tickets_earned')
+                .eq('id', userId)
+                .single();
+
+            if (userError || !user) {
+                return { success: false, error: 'Utilisateur introuvable' };
+            }
+
+            // Calculer le nouveau total
+            const newTicketCount = user.tickets + amount;
+            const newTotalEarned = user.total_tickets_earned + amount;
+
+            // Mettre à jour les tickets
+            const { error: updateError } = await this.supabase
+                .from('gamemarcus_users')
+                .update({ 
+                    tickets: newTicketCount,
+                    total_tickets_earned: newTotalEarned
+                })
+                .eq('id', userId);
+
+            if (updateError) {
+                return { success: false, error: 'Erreur mise à jour tickets' };
+            }
+
+            // Enregistrer la transaction
+            await this.supabase
+                .from('gamemarcus_tickets')
+                .insert([{
+                    user_id: userId,
+                    amount: amount,
+                    type: 'action_reward',
+                    description: `Action: ${actionName}`,
+                    created_at: new Date().toISOString()
+                }]);
+
+            return { 
+                success: true, 
+                newTicketCount: newTicketCount,
+                amount: amount
+            };
+            
+        } catch (error) {
+            console.error('Erreur gain tickets:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // 📊 RÉCUPÉRER LES STATISTIQUES
     async getStatistics() {
         if (!this.supabase) {
             return {
@@ -172,18 +402,35 @@ class SupabaseDatabase {
         }
 
         try {
-            // Ces requêtes peuvent échouer si les tables n'existent pas
-            const userCount = 0;
-            const contestCount = 4;
-            const winnerCount = 0;
+            // Compter les utilisateurs
+            const { count: userCount } = await this.supabase
+                .from('gamemarcus_users')
+                .select('*', { count: 'exact', head: true });
+
+            // Compter les concours
+            const { count: contestCount } = await this.supabase
+                .from('gamemarcus_contests')
+                .select('*', { count: 'exact', head: true });
+
+            // Compter les gagnants
+            const { count: winnerCount } = await this.supabase
+                .from('gamemarcus_winners')
+                .select('*', { count: 'exact', head: true });
+
+            // Calculer le total des tickets
+            const { data: users } = await this.supabase
+                .from('gamemarcus_users')
+                .select('tickets');
+
+            const totalTickets = users ? users.reduce((sum, user) => sum + user.tickets, 0) : 0;
 
             return {
                 success: true,
                 data: {
-                    totalUsers: userCount,
-                    totalContests: contestCount,
-                    totalWinners: winnerCount,
-                    totalTickets: 0
+                    totalUsers: userCount || 0,
+                    totalContests: contestCount || 0,
+                    totalWinners: winnerCount || 0,
+                    totalTickets: totalTickets
                 }
             };
         } catch (error) {
@@ -199,9 +446,31 @@ class SupabaseDatabase {
         }
     }
 
+    // 🏆 RÉCUPÉRER LES GAGNANTS
+    async getWinners(limit = 6) {
+        if (!this.supabase) {
+            return { success: true, data: [] };
+        }
+
+        try {
+            const { data, error } = await this.supabase
+                .from('gamemarcus_winners')
+                .select('*')
+                .order('drawn_at', { ascending: false })
+                .limit(limit);
+
+            if (error) {
+                return { success: true, data: [] };
+            }
+
+            return { success: true, data: data || [] };
+        } catch (error) {
+            return { success: true, data: [] };
+        }
+    }
+
     // 🔧 UTILITAIRES
     hashPassword(password) {
-        // Hash simple pour la démo
         let hash = 0;
         for (let i = 0; i < password.length; i++) {
             const char = password.charCodeAt(i);
