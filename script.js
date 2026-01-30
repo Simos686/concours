@@ -31,51 +31,33 @@ class GameMarcusApp {
     setupEventListeners() {
         console.log('🔧 Configuration des écouteurs...');
         
-        // Fonction pour attacher les écouteurs
-        const attachListeners = () => {
-            // Inscription
-            const registerForm = document.getElementById('registerForm');
-            if (registerForm) {
-                registerForm.onsubmit = null; // Supprimer les anciens
-                registerForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('📝 Formulaire inscription soumis');
-                    this.register();
-                    return false;
-                });
-            }
+        // Inscription
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.register();
+                return false;
+            });
+        }
 
-            // Connexion
-            const loginForm = document.getElementById('loginForm');
-            if (loginForm) {
-                loginForm.onsubmit = null; // Supprimer les anciens
-                loginForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('🔑 Formulaire connexion soumis');
-                    this.login();
-                    return false;
-                });
-            }
-        };
-
-        // Attendre que le DOM soit prêt
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', attachListeners);
-        } else {
-            attachListeners();
+        // Connexion
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.login();
+                return false;
+            });
         }
     }
 
     async register() {
-        console.log('🔄 Début inscription...');
-        
         const username = document.getElementById('username').value.trim();
         const email = document.getElementById('email').value.trim().toLowerCase();
         const password = document.getElementById('password').value;
-
-        console.log('Données saisies:', { username, email, password });
 
         if (!username || !email || !password) {
             this.showNotification('❌ Tous les champs sont requis', 'error');
@@ -91,8 +73,6 @@ class GameMarcusApp {
 
         const result = await this.db.createUser(username, email, password);
 
-        console.log('Résultat création:', result);
-
         if (result.success) {
             this.currentUser = result.user;
             localStorage.setItem('current_user', JSON.stringify(result.user));
@@ -101,10 +81,8 @@ class GameMarcusApp {
             this.updateUI();
             this.loadBasicData();
             
-            // Réinitialiser le formulaire
             document.getElementById('registerForm').reset();
             
-            // Basculer vers connexion
             setTimeout(() => {
                 this.switchToLoginTab();
             }, 1500);
@@ -129,8 +107,6 @@ class GameMarcusApp {
     }
 
     async login() {
-        console.log('🔄 Début connexion...');
-        
         const email = document.getElementById('loginEmail').value.trim().toLowerCase();
         const password = document.getElementById('loginPassword').value;
 
@@ -150,6 +126,7 @@ class GameMarcusApp {
             this.showNotification(`✅ Bon retour ${result.user.username} !`, 'success');
             this.updateUI();
             this.loadBasicData();
+            this.loadUserParticipations();
             
             document.getElementById('loginForm').reset();
         } else {
@@ -162,7 +139,7 @@ class GameMarcusApp {
         localStorage.removeItem('current_user');
         this.showNotification('👋 À bientôt !', 'info');
         this.updateUI();
-        this.loadBasicData(); // Recharger pour montrer mode non connecté
+        this.loadBasicData();
     }
 
     async loadBasicData() {
@@ -178,21 +155,38 @@ class GameMarcusApp {
             if (statsResult.success) {
                 this.updateStats(statsResult.data);
             }
+
+            // Charger les gagnants
+            const winnersResult = await this.db.getWinners();
+            if (winnersResult.success) {
+                this.renderWinners(winnersResult.data);
+            }
         } catch (error) {
             console.error('Erreur chargement données:', error);
         }
     }
 
+    async loadUserParticipations() {
+        if (!this.currentUser) return;
+
+        try {
+            const result = await this.db.getUserParticipations(this.currentUser.id);
+            
+            if (result.success) {
+                this.renderParticipations(result.data);
+                this.updateUserStats(result.data);
+            }
+        } catch (error) {
+            console.error('Erreur chargement participations:', error);
+        }
+    }
+
     updateUI() {
-        console.log('🔄 Mise à jour interface...');
-        
         const userSection = document.getElementById('userSection');
         const authBox = document.getElementById('authBox');
         const participationsSection = document.getElementById('myParticipations');
 
         if (this.currentUser) {
-            console.log('Mode connecté pour:', this.currentUser.username);
-            
             userSection.innerHTML = `
                 <div class="user-info">
                     <i class="fas fa-user"></i>
@@ -210,15 +204,30 @@ class GameMarcusApp {
             if (authBox) authBox.style.display = 'none';
             if (participationsSection) {
                 participationsSection.style.display = 'block';
+                this.loadUserParticipations();
             }
         } else {
-            console.log('Mode non connecté');
             if (userSection) userSection.innerHTML = '';
             if (authBox) authBox.style.display = 'block';
             if (participationsSection) {
                 participationsSection.style.display = 'none';
             }
         }
+    }
+
+    updateUserStats(participations) {
+        if (!this.currentUser) return;
+
+        const participationCount = participations ? participations.length : 0;
+        let winChance = 0;
+        
+        if (participationCount > 0) {
+            winChance = Math.min(participationCount * 2, 50);
+        }
+
+        document.getElementById('userTickets').textContent = this.currentUser.tickets;
+        document.getElementById('userParticipations').textContent = participationCount;
+        document.getElementById('userWinChance').textContent = `${winChance}%`;
     }
 
     renderContests(contests) {
@@ -244,7 +253,7 @@ class GameMarcusApp {
                         <span><i class="fas fa-ticket-alt"></i> ${contest.tickets_required} ticket(s)</span>
                     </div>
                     <button class="participate-btn" 
-                            onclick="${this.currentUser ? `app.participate(${contest.id})` : `app.showLoginMessage()`}"
+                            onclick="app.participate(${contest.id})"
                             ${this.currentUser && !canParticipate ? 'disabled' : ''}>
                         <i class="fas fa-ticket-alt"></i>
                         ${this.currentUser ? 
@@ -256,6 +265,135 @@ class GameMarcusApp {
                 </div>
             `;
         }).join('');
+    }
+
+    async participate(contestId) {
+        if (!this.currentUser) {
+            this.showNotification('❌ Connectez-vous pour participer', 'error');
+            return;
+        }
+
+        // Demander confirmation
+        const contestResult = await this.db.getContestById(contestId);
+        if (contestResult.success) {
+            const contest = contestResult.data;
+            
+            if (!confirm(`Participer au concours "${contest.name}" avec ${contest.tickets_required} ticket(s) ?`)) {
+                return;
+            }
+
+            this.showNotification('🔄 Participation en cours...', 'info');
+
+            const result = await this.db.participate(this.currentUser.id, contestId);
+
+            if (result.success) {
+                // Mettre à jour l'utilisateur local
+                this.currentUser.tickets = result.newTicketCount;
+                localStorage.setItem('current_user', JSON.stringify(this.currentUser));
+                
+                this.showNotification(
+                    `🎫 Participation enregistrée ! ${result.ticketsUsed} ticket(s) utilisés. Bonne chance ! 🍀`,
+                    'success'
+                );
+
+                this.updateUI();
+                this.loadBasicData();
+                this.loadUserParticipations();
+                
+            } else {
+                this.showNotification(`❌ ${result.error}`, 'error');
+            }
+        }
+    }
+
+    async earnTickets(actionId, tickets, actionName) {
+        if (!this.currentUser) {
+            this.showNotification('❌ Connectez-vous pour gagner des tickets', 'error');
+            return;
+        }
+
+        this.showNotification('🔄 Ajout des tickets...', 'info');
+
+        const result = await this.db.earnTickets(this.currentUser.id, tickets, actionName);
+
+        if (result.success) {
+            // Mettre à jour l'utilisateur local
+            this.currentUser.tickets = result.newTicketCount;
+            localStorage.setItem('current_user', JSON.stringify(this.currentUser));
+
+            this.showNotification(`✅ +${tickets} tickets ! Total: ${result.newTicketCount} 🎫`, 'success');
+            this.updateUI();
+            this.loadBasicData();
+        } else {
+            this.showNotification(`❌ ${result.error}`, 'error');
+        }
+    }
+
+    renderParticipations(participations) {
+        const container = document.getElementById('participationsList');
+        if (!container) return;
+
+        if (!participations || participations.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="text-align: center; padding: 40px; opacity: 0.7;">
+                    <i class="fas fa-calendar-plus fa-3x"></i>
+                    <h4 style="margin: 15px 0 10px;">Aucune participation</h4>
+                    <p>Participez à votre premier concours !</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = participations.map(p => `
+            <div class="participation-item">
+                <div class="participation-details">
+                    <h4>${p.gamemarcus_contests?.name || 'Concours'}</h4>
+                    <p style="font-size: 0.9em; margin: 5px 0; color: #ccc;">
+                        ${p.gamemarcus_contests?.description || ''}
+                    </p>
+                    <small style="opacity: 0.7;">
+                        ${new Date(p.created_at).toLocaleDateString('fr-FR')} • 
+                        Prix: ${p.gamemarcus_contests?.prize || 'N/A'} •
+                        Tickets: ${p.tickets_used}
+                    </small>
+                </div>
+                <div class="participation-stats">
+                    <div class="participation-tickets" style="background: rgba(0, 219, 222, 0.2); padding: 5px 15px; border-radius: 20px;">
+                        ${p.tickets_used} ticket(s)
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderWinners(winners) {
+        const container = document.getElementById('winnersGrid');
+        if (!container) return;
+
+        if (!winners || winners.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; opacity: 0.7;">
+                    <i class="fas fa-trophy fa-3x"></i>
+                    <h4 style="margin: 15px 0 10px;">Aucun gagnant pour l'instant</h4>
+                    <p>Soyez le premier à gagner !</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = winners.map(winner => `
+            <div class="winner-card">
+                <div class="winner-avatar" style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 2rem; color: white;">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <h4 class="winner-name">${winner.username}</h4>
+                <p class="winner-prize" style="color: var(--accent);">${winner.prize}</p>
+                <p class="winner-date" style="font-size: 0.9em; opacity: 0.7;">
+                    ${new Date(winner.drawn_at).toLocaleDateString('fr-FR')}
+                </p>
+                <small style="font-size: 0.8em; opacity: 0.6;">${winner.tickets_used || 1} ticket(s) utilisés</small>
+            </div>
+        `).join('');
     }
 
     updateStats(stats) {
@@ -270,32 +408,10 @@ class GameMarcusApp {
         }
     }
 
-    showLoginMessage() {
-        this.showNotification('🔑 Connectez-vous pour participer aux concours', 'info');
-    }
-
-    async participate(contestId) {
-        if (!this.currentUser) {
-            this.showNotification('❌ Connectez-vous pour participer', 'error');
-            return;
-        }
-
-        this.showNotification('🔄 Participation en cours...', 'info');
-        
-        // Simuler une participation
-        setTimeout(() => {
-            this.showNotification('🎫 Participation enregistrée ! Bonne chance !', 'success');
-        }, 1000);
-    }
-
     // 🔔 NOTIFICATIONS
     showNotification(message, type = 'info') {
-        console.log('Notification:', { message, type });
-        
         const notification = document.getElementById('notification');
         if (!notification) {
-            console.error('Élément notification non trouvé');
-            // Créer une notification temporaire
             alert(message);
             return;
         }
@@ -340,11 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function showTab(tabName) {
     if (event) event.preventDefault();
     
-    // Désactiver tous les onglets
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
-    // Activer l'onglet cliqué
     const targetTab = event.target;
     if (targetTab && targetTab.classList.contains('tab-btn')) {
         targetTab.classList.add('active');
