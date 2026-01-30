@@ -254,13 +254,38 @@ class GameMarcusApp {
             // Calcul plus réaliste basé sur les tickets utilisés
             const totalTicketsUsed = participations.reduce((sum, p) => sum + p.tickets_used, 0);
             winChance = Math.min(totalTicketsUsed * 5, 80); // 5% par ticket utilisé
+        
         }
 
         document.getElementById('userTickets').textContent = this.currentUser.tickets;
         document.getElementById('userParticipations').textContent = participationCount;
         document.getElementById('userWinChance').textContent = `${winChance}%`;
     }
+async updateUserStats(participations) {
+    if (!this.currentUser) return;
 
+    // 1. Récupère les données fraîches depuis Supabase
+    const freshUserResult = await this.db.getUserById(this.currentUser.id);
+    if (freshUserResult.success) {
+        this.currentUser = freshUserResult.data;
+        localStorage.setItem('current_user', JSON.stringify(freshUserResult.data));
+    }
+
+    // 2. Récupère les participations
+    const participationCount = participations ? participations.length : 0;
+    
+    // 3. Calcule les chances de gagner
+    let winChance = 0;
+    if (participationCount > 0) {
+        const totalTicketsUsed = participations.reduce((sum, p) => sum + p.tickets_used, 0);
+        winChance = Math.min(totalTicketsUsed * 5, 80); // 5% par ticket utilisé
+    }
+
+    // 4. Met à jour l'interface
+    document.getElementById('userTickets').textContent = this.currentUser.tickets || 0;
+    document.getElementById('userParticipations').textContent = participationCount;
+    document.getElementById('userWinChance').textContent = `${winChance}%`;
+}
     updateStats(stats) {
         // Mettre à jour les statistiques principales
         document.getElementById('totalUsers').textContent = stats.totalUsers;
@@ -718,3 +743,4 @@ function closeModal(modalId) {
 function showTerms() {
     showModal('termsModal');
 }
+
